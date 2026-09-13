@@ -1,0 +1,140 @@
+import os
+
+# Dicionário que atuará como nosso banco de dados em memória
+estoque = {}
+
+def limpar_tela():
+    # Limpa o terminal para melhorar a experiência visual
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def cadastrar_produto():
+    limpar_tela()
+    print("=== CADASTRAR PRODUTO ===")
+    id_produto = input("Digite o ID ou Código do produto: ").strip()
+    if id_produto in estoque:
+        print("\nErro: Este código de produto já está cadastrado!")
+        input("\nPressione Enter para voltar ao menu...")
+        return
+
+    nome = input("Nome do produto: ").strip()
+    try:
+        quantidade = int(input("Quantidade inicial em estoque: "))
+        preco = float(input("Preço unitário (R$): "))
+        if quantidade < 0 or preco < 0:
+            raise ValueError
+    except ValueError:
+        print("\nErro: Quantidade e Preço devem ser números positivos!")
+        input("\nPressione Enter para voltar ao menu...")
+        return
+
+    estoque[id_produto] = {
+        "nome": nome,
+        "quantidade": quantidade,
+        "preco": preco
+    }
+    print(f"\nProduto '{nome}' cadastrado com sucesso!")
+    input("\nPressione Enter para voltar ao menu...")
+
+def listar_produtos():
+    limpar_tela()
+    print("=== PRODUTOS EM ESTOQUE ===")
+    if not estoque:
+        print("Nenhum produto cadastrado até o momento.")
+    else:
+        print(f"{'ID':<10} | {'Nome':<25} | {'Qtd':<8} | {'Preço Unit.':<12} | {'Total':<12}")
+        print("-" * 75)
+        valor_total_estoque = 0
+        for id_prod, dados in estoque.items():
+            total_item = dados["quantidade"] * dados["preco"]
+            valor_total_estoque += total_item
+            print(f"{id_prod:<10} | {dados['nome']:<25} | {dados['quantidade']:<8} | R$ {dados['preco']:>9.2f} | R$ {total_item:>9.2f}")
+        print("-" * 75)
+        print(f"Valor Total do Patrimônio em Estoque: R$ {valor_total_estoque:.2f}")
+    input("\nPressione Enter para voltar ao menu...")
+
+def atualizar_quantidade():
+    limpar_tela()
+    print("=== ATUALIZAR QUANTIDADE ===")
+    id_produto = input("Digite o ID do produto: ").strip()
+    if id_produto not in estoque:
+        print("\nErro: Produto não localizado.")
+        input("\nPressione Enter para voltar ao menu...")
+        return
+
+    produto = estoque[id_produto]
+    print(f"\nProduto selecionado: {produto['nome']} (Estoque atual: {produto['quantidade']})")
+    print("1. Adicionar Entrada (+)")
+    print("2. Registrar Saída/Venda (-)")
+    opcao = input("Escolha a operação: ")
+
+    try:
+        qtd_movimentada = int(input("Digite a quantidade de itens: "))
+        if qtd_movimentada <= 0:
+            raise ValueError
+    except ValueError:
+        print("\nErro: A quantidade deve ser um número inteiro maior que zero!")
+        input("\nPressione Enter para voltar ao menu...")
+        return
+
+    if opcao == '1':
+        produto['quantidade'] += qtd_movimentada
+        print(f"\nEntrada registrada! Novo estoque de {produto['nome']}: {produto['quantidade']}")
+    elif opcao == '2':
+        if qtd_movimentada > produto['quantidade']:
+            print(f"\nErro: Estoque insuficiente! Você só possui {produto['quantidade']} unidades.")
+        else:
+            produto['quantidade'] -= qtd_movimentada
+            print(f"\nSaída registrada! Novo estoque de {produto['nome']}: {produto['quantidade']}")
+            if produto['quantidade'] == 0:
+                print("Alerta: Este item acabou de esgotar no estoque!")
+    else:
+        print("\nOpção inválida!")
+    input("\nPressione Enter para voltar ao menu...")
+
+def excluir_produto():
+    limpar_tela()
+    print("=== REMOVER PRODUTO ===")
+    id_produto = input("Digite o ID do produto que deseja excluir: ").strip()
+    if id_produto in estoque:
+        nome_prod = estoque[id_produto]['nome']
+        confirmar = input(f"Tem certeza que deseja deletar '{nome_prod}'? (S/N): ").strip().upper()
+        if confirmar == 'S':
+            del estoque[id_produto]
+            print(f"\nProduto removido com sucesso!")
+        else:
+            print("\nOperação cancelada.")
+    else:
+        print("\nErro: Produto não localizado.")
+    input("\nPressione Enter para voltar ao menu...")
+
+def menu_principal():
+    while True:
+        limpar_tela()
+        print("====================================")
+        print("   SISTEMA DE CONTROLE DE ESTOQUE   ")
+        print("====================================")
+        print(" 1 Cadastrar Novo Produto")
+        print(" 2 Listar Todos os Produtos")
+        print(" 3 Atualizar Quantidade (Entrada/Saída)")
+        print(" 4 Excluir Produto do Sistema")
+        print(" 5 Sair do Programa")
+        print("====================================")
+        opcao = input("Escolha uma opção (1-5): ").strip()
+
+        if opcao == '1':
+            cadastrar_produto()
+        elif opcao == '2':
+            listar_produtos()
+        elif opcao == '3':
+            atualizar_quantidade()
+        elif opcao == '4':
+            excluir_produto()
+        elif opcao == '5':
+            print("\nEncerrando o sistema de estoque. Até logo!")
+            break
+        else:
+            print("\nOpção inválida! Escolha um número de 1 a 5.")
+            input("\nPressione Enter para continuar...")
+
+if __name__ == "__main__":
+    menu_principal()
