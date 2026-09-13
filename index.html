@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Data Lakehouse & AI Control Plane v3.5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            500: '#06b6d4',
+                            600: '#0284c7',
+                            900: '#0c4a6e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .code-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        .code-scroll::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 11px;
+        }
+        
+        th,
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #1e293b;
+        }
+        
+        th {
+            color: #38bdf8;
+            font-weight: 600;
+            background: #0f172a;
+        }
+        
+        tr:hover {
+            background: rgba(30, 41, 59, 0.4);
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-gradient-to-tr from-cyan-600 to-indigo-600 rounded-lg shadow-lg">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 012-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold bg-gradient-to-r from-cyan-400 to-indigo-400 bg-clip-text text-transparent">Lakehouse Control Plane v3.5</h1>
+                    <p class="text-xs text-slate-400">Multi-tenant Data Engine, Dynamic Import/Input & Predictive AI</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <button onclick="app.exportData()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-1.5 px-3 rounded-lg transition text-xs flex items-center space-x-1">
+          <span>📥 Exportar JSON</span>
+        </button>
+
+                <button onclick="app.runFullPipeline()" class="bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-semibold py-1.5 px-4 rounded-lg shadow-md transition text-xs flex items-center space-x-2">
+          <span>⚡ Recalcular Pipeline</span>
+        </button>
+            </div>
+        </div>
+
+        <!-- Navegação -->
+        <div class="border-t border-slate-800 bg-slate-900/50 px-4">
+            <div class="max-w-7xl mx-auto flex space-x-6 overflow-x-auto text-xs">
+                <button onclick="app.switchTab('ingestion')" class="nav-btn text-cyan-400 border-b-2 border-cyan-400 py-3 font-medium flex items-center space-x-2 whitespace-nowrap" data-tab="ingestion">
+          <span>📥 Inserção & Importação de Dados</span>
+        </button>
+                <button onclick="app.switchTab('medallion')" class="nav-btn text-slate-400 py-3 font-medium flex items-center space-x-2 whitespace-nowrap" data-tab="medallion">
+          <span>🔄 Medallion (Bronze, Silver, Gold)</span>
+        </button>
+                <button onclick="app.switchTab('simulator')" class="nav-btn text-slate-400 py-3 font-medium flex items-center space-x-2 whitespace-nowrap" data-tab="simulator">
+          <span>🎛️ Simulador What-If</span>
+        </button>
+                <button onclick="app.switchTab('governance')" class="nav-btn text-slate-400 py-3 font-medium flex items-center space-x-2 whitespace-nowrap" data-tab="governance">
+          <span>🛡️ Governança (LGPD & RLS)</span>
+        </button>
+                <button onclick="app.switchTab('ai_analytics')" class="nav-btn text-slate-400 py-3 font-medium flex items-center space-x-2 whitespace-nowrap" data-tab="ai_analytics">
+          <span>🤖 IA, Anomalias & Z-Score</span>
+        </button>
+                <button onclick="app.switchTab('powerbi')" class="nav-btn text-slate-400 py-3 font-medium flex items-center space-x-2 whitespace-nowrap" data-tab="powerbi">
+          <span>📊 Dashboards & DAX (Power BI)</span>
+        </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Global Executive KPI Bar -->
+    <section class="bg-slate-900/90 border-b border-slate-800 py-3 px-6">
+        <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-5 gap-4 text-center md:text-left">
+            <div>
+                <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Receita Bruta Total</span>
+                <span id="kpiTotalRevenue" class="text-base font-extrabold text-emerald-400">R$ 0,00</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Lucro Bruto Projetado</span>
+                <span id="kpiTotalProfit" class="text-base font-extrabold text-cyan-400">R$ 0,00</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Margem Média Geral</span>
+                <span id="kpiAvgMargin" class="text-base font-extrabold text-indigo-400">0%</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Total de Registros</span>
+                <span id="kpiTotalRecords" class="text-base font-extrabold text-amber-400">0</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Qualidade dos Dados</span>
+                <span class="text-base font-extrabold text-emerald-400">100% OK (Strict)</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-grow p-6 max-w-7xl mx-auto w-full space-y-6">
+
+        <!-- TAB 1: INSERÇÃO & IMPORTAÇÃO -->
+        <section id="ingestion" class="tab-content active space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- Formulário de Inserção Manual -->
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
+                    <h3 class="text-sm font-bold text-cyan-400 uppercase tracking-wider">✍️ Inserir Novo Produto (ERP Manual)</h3>
+                    <form onsubmit="app.handleManualInsert(event)" class="space-y-3 text-xs">
+                        <div>
+                            <label class="block text-slate-400 mb-1">Título / Nome do Produto</label>
+                            <input type="text" id="inputTitle" required placeholder="Ex: Servidor Cloud Enterprise" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 focus:outline-none focus:border-cyan-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-slate-400 mb-1">Categoria</label>
+                                <input type="text" id="inputCategory" required placeholder="Ex: Hardware" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 focus:outline-none focus:border-cyan-500">
+                            </div>
+                            <div>
+                                <label class="block text-slate-400 mb-1">Preço de Venda (R$)</label>
+                                <input type="number" step="0.01" id="inputPrice" required placeholder="1500.00" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 focus:outline-none focus:border-cyan-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-slate-400 mb-1">Custo Unitário (R$)</label>
+                                <input type="number" step="0.01" id="inputCost" required placeholder="800.00" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 focus:outline-none focus:border-cyan-500">
+                            </div>
+                            <div>
+                                <label class="block text-slate-400 mb-1">Vendedor Responsável</label>
+                                <input type="text" id="inputRep" required placeholder="Ex: Carlos Silva" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 focus:outline-none focus:border-cyan-500">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 rounded transition">
+              Adicionar ao Lakehouse
+            </button>
+                    </form>
+                </div>
+
+                <!-- Importador de Arquivos -->
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-indigo-400 uppercase tracking-wider mb-2">📁 Importar Arquivo (JSON ou CSV)</h3>
+                        <p class="text-xs text-slate-400 mb-4">Carregue dados externos diretamente para o Data Lake. O formato deve conter os campos: <code>title</code>, <code>category</code>, <code>price</code>.</p>
+
+                        <div class="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-lg p-6 text-center cursor-pointer bg-slate-950 transition" onclick="document.getElementById('fileInput').click()">
+                            <svg class="w-10 h-10 text-indigo-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <span class="text-xs text-slate-300 font-medium block">Clique para selecionar um arquivo .json ou .csv</span>
+                            <span class="text-[10px] text-slate-500 block mt-1">Exemplo CSV: title,category,price,unit_cost,sales_rep</span>
+                        </div>
+                        <input type="file" id="fileInput" accept=".json,.csv" class="hidden" onchange="app.handleFileUpload(event)">
+                    </div>
+
+                    <div id="importStatus" class="text-xs font-mono text-emerald-400 bg-slate-950 p-3 rounded border border-slate-800 hidden">
+                        Pronto para importar.
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- TAB 2: MEDALLION ARCHITECTURE -->
+        <section id="medallion" class="tab-content space-y-6">
+            <div class="grid grid-cols-1 gap-6">
+
+                <!-- Bronze Table -->
+                <div class="bg-slate-900 border border-amber-900/40 p-4 rounded-xl space-y-3">
+                    <div class="flex items-center justify-between border-b border-amber-900/40 pb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 bg-amber-600 rounded-full"></span>
+                            <h3 class="font-bold text-amber-500 text-sm">Bronze Layer (01_raw_ingestion.ts)</h3>
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-mono">Dados Brutos Ingeridos</span>
+                    </div>
+                    <div class="overflow-x-auto code-scroll max-h-64">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>id</th>
+                                    <th>title / name</th>
+                                    <th>category / role</th>
+                                    <th>price</th>
+                                    <th>_source</th>
+                                    <th>_ingested_at</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bronzeTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Silver Table -->
+                <div class="bg-slate-900 border border-slate-700 p-4 rounded-xl space-y-3">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 bg-slate-300 rounded-full"></span>
+                            <h3 class="font-bold text-slate-300 text-sm">Silver Layer (02_silver_joined.ts)</h3>
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-mono">Tratado & Enriquecido</span>
+                    </div>
+                    <div class="overflow-x-auto code-scroll max-h-64">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>product_id</th>
+                                    <th>title</th>
+                                    <th>category</th>
+                                    <th>price</th>
+                                    <th>unit_cost</th>
+                                    <th>margin_%</th>
+                                    <th>sales_rep</th>
+                                    <th>crm_leads</th>
+                                    <th>crm_deals</th>
+                                    <th>conv_%</th>
+                                </tr>
+                            </thead>
+                            <tbody id="silverTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Gold Table -->
+                <div class="bg-slate-900 border border-yellow-600/30 p-4 rounded-xl space-y-3">
+                    <div class="flex items-center justify-between border-b border-yellow-600/30 pb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 bg-yellow-400 rounded-full"></span>
+                            <h3 class="font-bold text-yellow-400 text-sm">Gold Layer (03_gold_aggregated.ts)</h3>
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-mono">Agregado para BI</span>
+                    </div>
+                    <div class="overflow-x-auto code-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>category</th>
+                                    <th>receita_total</th>
+                                    <th>custo_total</th>
+                                    <th>lucro_bruto</th>
+                                    <th>margem_media</th>
+                                    <th>leads_crm</th>
+                                    <th>deals_crm</th>
+                                    <th>taxa_conversao</th>
+                                </tr>
+                            </thead>
+                            <tbody id="goldTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- TAB 3: SIMULADOR WHAT-IF -->
+        <section id="simulator" class="tab-content space-y-6">
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-6">
+                <div>
+                    <h3 class="text-sm font-bold text-cyan-400 uppercase tracking-wider mb-1">Simulador de Cenários Financeiros (What-If Engine)</h3>
+                    <p class="text-xs text-slate-400">Modifique os preços e custos operacionais para recalcular os dados em tempo real.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs">
+                            <label class="font-medium text-slate-200">Reajuste de Preço de Venda:</label>
+                            <span id="priceAdjVal" class="text-cyan-400 font-bold">+0%</span>
+                        </div>
+                        <input type="range" id="priceRange" min="-30" max="50" value="0" oninput="app.updateSimulation()" class="w-full accent-cyan-500 cursor-pointer">
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs">
+                            <label class="font-medium text-slate-200">Variação dos Custos dos Insumos:</label>
+                            <span id="costAdjVal" class="text-red-400 font-bold">+0%</span>
+                        </div>
+                        <input type="range" id="costRange" min="-20" max="40" value="0" oninput="app.updateSimulation()" class="w-full accent-red-500 cursor-pointer">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-slate-950 p-4 rounded-lg border border-slate-800 text-center">
+                        <span class="text-[10px] text-slate-400 uppercase">Impacto na Receita</span>
+                        <h4 id="simRevenue" class="text-lg font-bold text-emerald-400 mt-1">R$ 0,00</h4>
+                    </div>
+                    <div class="bg-slate-950 p-4 rounded-lg border border-slate-800 text-center">
+                        <span class="text-[10px] text-slate-400 uppercase">Lucro Projetado</span>
+                        <h4 id="simProfit" class="text-lg font-bold text-cyan-400 mt-1">R$ 0,00</h4>
+                    </div>
+                    <div class="bg-slate-950 p-4 rounded-lg border border-slate-800 text-center">
+                        <span class="text-[10px] text-slate-400 uppercase">Margem Recalculada</span>
+                        <h4 id="simMargin" class="text-lg font-bold text-indigo-400 mt-1">0%</h4>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: GOVERNANÇA -->
+        <section id="governance" class="tab-content space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-bold text-cyan-400 text-sm">05_governance_lgpd.ts</h3>
+                        <span class="text-xs bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">LGPD: ATIVA</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Mascaramento dinâmico de PII (e-mails).</p>
+
+                    <div class="bg-slate-950 p-4 rounded border border-slate-800 flex items-center justify-between">
+                        <label for="maskToggle" class="text-xs font-medium text-slate-200">Anonimizar Dados Sensíveis (PII)</label>
+                        <input type="checkbox" id="maskToggle" checked onchange="app.toggleMasking()" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                    </div>
+
+                    <div class="text-xs">
+                        <span class="text-slate-400">Vendedores Mascarados:</span>
+                        <pre id="piiPreview" class="bg-slate-950 p-3 rounded font-mono text-emerald-400 mt-2 h-40 overflow-y-auto code-scroll">Processando PII...</pre>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-bold text-cyan-400 text-sm">06_rls_tenant_policy.ts</h3>
+                        <span class="text-xs bg-cyan-950 text-cyan-400 px-2 py-0.5 rounded border border-cyan-800">RLS: ATIVA</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Isolamento Multi-tenant por perfil.</p>
+
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-300">Contexto de Tenant Ativo:</label>
+                        <select id="tenantSelect" onchange="app.applyRLS()" class="w-full bg-slate-950 border border-slate-800 text-xs rounded p-2 text-slate-200 focus:outline-none">
+              <option value="Tenant_North" selected>Tenant_North (Norte)</option>
+              <option value="Tenant_South">Tenant_South (Sul)</option>
+              <option value="ALL">Administrator (Todos)</option>
+            </select>
+                    </div>
+
+                    <div class="text-xs">
+                        <span class="text-slate-400">Visão Filtrada por RLS:</span>
+                        <pre id="rlsPreview" class="bg-slate-950 p-3 rounded font-mono text-slate-300 mt-2 h-32 overflow-y-auto code-scroll">Aguardando RLS...</pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 5: IA, ANOMALIAS & Z-SCORE -->
+        <section id="ai_analytics" class="tab-content space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
+                    <h3 class="font-bold text-indigo-400 text-sm">ai_engine/margin_anomaly.ts (Z-Score)</h3>
+                    <div id="anomalyOutput" class="bg-slate-950 p-4 rounded border border-slate-800 text-xs font-mono space-y-2 text-slate-300 min-h-[160px]">
+                        Executando cálculo estatístico...
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
+                    <h3 class="font-bold text-indigo-400 text-sm">ai_engine/conversion_forecast.ts</h3>
+                    <div id="forecastOutput" class="bg-slate-950 p-4 rounded border border-slate-800 text-xs font-mono space-y-2 text-slate-300 min-h-[160px]">
+                        Avaliando performance de conversão...
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 6: POWER BI & DAX -->
+        <section id="powerbi" class="tab-content space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="md:col-span-2 bg-slate-900 p-5 rounded-xl border border-slate-800">
+                    <h3 class="text-xs font-bold text-slate-300 mb-4">Receita Bruta vs. Lucro por Categoria</h3>
+                    <canvas id="analyticsChart" class="max-h-64"></canvas>
+                </div>
+
+                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 space-y-3">
+                    <h3 class="text-xs font-bold text-amber-400">powerbi/measures.dax</h3>
+                    <pre class="bg-slate-950 p-3 rounded text-[10px] text-cyan-300 font-mono h-60 overflow-y-auto code-scroll leading-relaxed">
+-- Total Revenue
+Total Revenue = SUM(fct_sales[receita_total])
+
+-- Margem de Lucro Bruta (%)
+Profit Margin % = 
+VAR TotalRev = [Total Revenue]
+VAR TotalCost = SUM(fct_sales[total_cost])
+RETURN
+DIVIDE(TotalRev - TotalCost, TotalRev, 0)
+          </pre>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        class LakehousePlatform {
+            constructor() {
+                this.maskPII = true;
+                this.selectedTenant = 'Tenant_North';
+                this.priceAdjustment = 0;
+                this.costAdjustment = 0;
+
+                // Base Inicial Dinâmica
+                this.dataset = [{
+                    id: 101,
+                    title: "Servidor Rack 2U",
+                    category: "Hardware",
+                    price: 12000,
+                    unit_cost: 7500,
+                    sales_rep: "Ana Souza",
+                    email: "ana.souza@empresa.com"
+                }, {
+                    id: 102,
+                    title: "Licença ERP Enterprise",
+                    category: "Software",
+                    price: 4500,
+                    unit_cost: 1200,
+                    sales_rep: "Carlos Melo",
+                    email: "carlos.melo@empresa.com"
+                }, {
+                    id: 103,
+                    title: "Switch Gerenciável L3",
+                    category: "Redes",
+                    price: 3200,
+                    unit_cost: 2100,
+                    sales_rep: "Beatriz Lima",
+                    email: "beatriz.lima@empresa.com"
+                }, {
+                    id: 104,
+                    title: "Suporte Técnico 24/7",
+                    category: "Serviços",
+                    price: 8000,
+                    unit_cost: 5000,
+                    sales_rep: "Daniel Rocha",
+                    email: "daniel.rocha@empresa.com"
+                }];
+
+                this.bronzeData = [];
+                this.silverData = [];
+                this.goldData = [];
+                this.chartInstance = null;
+            }
+
+            runFullPipeline() {
+                this.processBronze();
+                this.processSilver();
+                this.processGold();
+                this.renderAll();
+            }
+
+            processBronze() {
+                const now = new Date().toISOString();
+                this.bronzeData = this.dataset.map(item => ({
+                    ...item,
+                    _source: item._source || "manual_or_file_ingestion",
+                    _ingested_at: now
+                }));
+            }
+
+            processSilver() {
+                const pFactor = 1 + (this.priceAdjustment / 100);
+                const cFactor = 1 + (this.costAdjustment / 100);
+
+                this.silverData = this.dataset.map((prod, idx) => {
+                    const adjPrice = (prod.price || 0) * pFactor;
+                    const adjCost = (prod.unit_cost || (prod.price * 0.6)) * cFactor;
+                    const profit = adjPrice - adjCost;
+                    const margin = adjPrice > 0 ? (profit / adjPrice) * 100 : 0;
+
+                    const leads = (idx + 1) * 15;
+                    const deals = Math.floor(leads * 0.3);
+                    const convRate = leads > 0 ? (deals / leads) * 100 : 0;
+
+                    return {
+                        product_id: prod.id,
+                        title: prod.title,
+                        category: prod.category || "Geral",
+                        price: adjPrice,
+                        unit_cost: adjCost,
+                        margin_percent: parseFloat(margin.toFixed(1)),
+                        sales_rep: prod.sales_rep || "Vendedor Padrão",
+                        rep_email: prod.email || "contato@empresa.com",
+                        crm_leads: leads,
+                        crm_closed_deals: deals,
+                        crm_conversion_rate: parseFloat(convRate.toFixed(1)),
+                        tenant_region: idx % 2 === 0 ? "Tenant_North" : "Tenant_South"
+                    };
+                });
+            }
+
+            processGold() {
+                const categories = [...new Set(this.silverData.map(s => s.category))];
+
+                this.goldData = categories.map(cat => {
+                    const catItems = this.silverData.filter(s => s.category === cat);
+                    const receita = catItems.reduce((acc, i) => acc + (i.price * 10), 0);
+                    const custo = catItems.reduce((acc, i) => acc + (i.unit_cost * 10), 0);
+                    const lucro = receita - custo;
+                    const margem = receita > 0 ? (lucro / receita) * 100 : 0;
+
+                    const totalLeads = catItems.reduce((acc, i) => acc + i.crm_leads, 0);
+                    const totalDeals = catItems.reduce((acc, i) => acc + i.crm_closed_deals, 0);
+                    const convRate = totalLeads > 0 ? (totalDeals / totalLeads) * 100 : 0;
+
+                    return {
+                        category: cat,
+                        receita_total: receita,
+                        custo_total: custo,
+                        lucro_bruto: lucro,
+                        margem_media_percent: parseFloat(margem.toFixed(1)),
+                        total_leads_crm: totalLeads,
+                        total_deals_crm: totalDeals,
+                        taxa_conversao_crm: parseFloat(convRate.toFixed(1))
+                    };
+                });
+            }
+
+            handleManualInsert(e) {
+                e.preventDefault();
+                const newItem = {
+                    id: Date.now(),
+                    title: document.getElementById('inputTitle').value,
+                    category: document.getElementById('inputCategory').value,
+                    price: parseFloat(document.getElementById('inputPrice').value),
+                    unit_cost: parseFloat(document.getElementById('inputCost').value),
+                    sales_rep: document.getElementById('inputRep').value,
+                    email: `${document.getElementById('inputRep').value.toLowerCase().replace(/\s+/g, '.')}@empresa.com`,
+                    _source: "manual_input"
+                };
+
+                this.dataset.push(newItem);
+                this.runFullPipeline();
+                e.target.reset();
+                alert('Produto adicionado com sucesso!');
+            }
+
+            handleFileUpload(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    const content = evt.target.result;
+                    try {
+                        if (file.name.endsWith('.json')) {
+                            const parsed = JSON.parse(content);
+                            const items = Array.isArray(parsed) ? parsed : [parsed];
+                            items.forEach(item => {
+                                this.dataset.push({
+                                    id: item.id || Date.now() + Math.floor(Math.random() * 1000),
+                                    title: item.title || "Item Importado",
+                                    category: item.category || "Importados",
+                                    price: parseFloat(item.price) || 0,
+                                    unit_cost: parseFloat(item.unit_cost) || (parseFloat(item.price) * 0.5),
+                                    sales_rep: item.sales_rep || "Importação Externa",
+                                    email: item.email || "import@empresa.com",
+                                    _source: "file_import_json"
+                                });
+                            });
+                        } else if (file.name.endsWith('.csv')) {
+                            const lines = content.split('\n').filter(l => l.trim() !== '');
+                            const headers = lines[0].split(',').map(h => h.trim());
+
+                            for (let i = 1; i < lines.length; i++) {
+                                const cols = lines[i].split(',').map(c => c.trim());
+                                if (cols.length >= 3) {
+                                    this.dataset.push({
+                                        id: Date.now() + i,
+                                        title: cols[0] || "Item CSV",
+                                        category: cols[1] || "Importados",
+                                        price: parseFloat(cols[2]) || 0,
+                                        unit_cost: parseFloat(cols[3]) || (parseFloat(cols[2]) * 0.5),
+                                        sales_rep: cols[4] || "Importação CSV",
+                                        email: "csv.import@empresa.com",
+                                        _source: "file_import_csv"
+                                    });
+                                }
+                            }
+                        }
+
+                        const statusEl = document.getElementById('importStatus');
+                        statusEl.innerText = `✅ Sucesso: Arquivo "${file.name}" importado e processado!`;
+                        statusEl.classList.remove('hidden');
+
+                        this.runFullPipeline();
+                    } catch (err) {
+                        alert('Erro ao processar arquivo. Verifique se a estrutura está correta.');
+                    }
+                };
+
+                reader.readAsText(file);
+            }
+
+            renderAll() {
+                this.renderTables();
+                this.renderExecutiveKPIs();
+                this.renderGovernance();
+                this.runAIModule();
+                this.renderBI();
+            }
+
+            renderTables() {
+                document.getElementById('bronzeTableBody').innerHTML = this.bronzeData.map(item => `
+          <tr>
+            <td class="font-mono">${item.id}</td>
+            <td>${item.title}</td>
+            <td class="text-slate-400">${item.category}</td>
+            <td>R$ ${item.price ? item.price.toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '—'}</td>
+            <td><span class="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300">${item._source}</span></td>
+            <td class="text-[10px] text-slate-400">${item._ingested_at}</td>
+          </tr>
+        `).join('');
+
+                document.getElementById('silverTableBody').innerHTML = this.silverData.map(item => `
+          <tr>
+            <td class="font-mono">${item.product_id}</td>
+            <td class="font-bold text-slate-200">${item.title}</td>
+            <td class="text-slate-400">${item.category}</td>
+            <td>R$ ${item.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+            <td>R$ ${item.unit_cost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+            <td class="font-bold ${item.margin_percent < 30 ? 'text-red-400' : 'text-cyan-400'}">${item.margin_percent}%</td>
+            <td>${item.sales_rep}</td>
+            <td>${item.crm_leads}</td>
+            <td>${item.crm_closed_deals}</td>
+            <td class="font-bold text-emerald-400">${item.crm_conversion_rate}%</td>
+          </tr>
+        `).join('');
+
+                document.getElementById('goldTableBody').innerHTML = this.goldData.map(item => `
+          <tr>
+            <td class="font-bold text-yellow-400">${item.category}</td>
+            <td>R$ ${item.receita_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+            <td>R$ ${item.custo_total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+            <td class="text-emerald-400 font-bold">R$ ${item.lucro_bruto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+            <td class="font-bold text-cyan-400">${item.margem_media_percent}%</td>
+            <td>${item.total_leads_crm}</td>
+            <td>${item.total_deals_crm}</td>
+            <td class="font-bold text-indigo-400">${item.taxa_conversao_crm}%</td>
+          </tr>
+        `).join('');
+            }
+
+            renderExecutiveKPIs() {
+                const totalRev = this.goldData.reduce((acc, curr) => acc + curr.receita_total, 0);
+                const totalLucro = this.goldData.reduce((acc, curr) => acc + curr.lucro_bruto, 0);
+                const margem = totalRev > 0 ? ((totalLucro / totalRev) * 100).toFixed(1) : 0;
+
+                document.getElementById('kpiTotalRevenue').innerText = `R$ ${totalRev.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                document.getElementById('kpiTotalProfit').innerText = `R$ ${totalLucro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                document.getElementById('kpiAvgMargin').innerText = `${margem}%`;
+                document.getElementById('kpiTotalRecords').innerText = this.dataset.length;
+
+                document.getElementById('simRevenue').innerText = `R$ ${totalRev.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                document.getElementById('simProfit').innerText = `R$ ${totalLucro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                document.getElementById('simMargin').innerText = `${margem}%`;
+            }
+
+            updateSimulation() {
+                this.priceAdjustment = parseFloat(document.getElementById('priceRange').value);
+                this.costAdjustment = parseFloat(document.getElementById('costRange').value);
+
+                document.getElementById('priceAdjVal').innerText = `${this.priceAdjustment >= 0 ? '+' : ''}${this.priceAdjustment}%`;
+                document.getElementById('costAdjVal').innerText = `${this.costAdjustment >= 0 ? '+' : ''}${this.costAdjustment}%`;
+
+                this.processSilver();
+                this.processGold();
+                this.renderAll();
+            }
+
+            renderGovernance() {
+                const piiData = this.silverData.map(item => ({
+                    vendedor: item.sales_rep,
+                    email: this.maskPII ? item.rep_email.replace(/(?<=.{2}).(?=.*@)/g, "*****") : item.rep_email,
+                    status_lgpd: this.maskPII ? 'MASCARADO' : 'EXPOSTO'
+                }));
+                document.getElementById('piiPreview').innerText = JSON.stringify(piiData, null, 2);
+
+                let filteredTenant = this.silverData;
+                if (this.selectedTenant !== 'ALL') {
+                    filteredTenant = this.silverData.filter(i => i.tenant_region === this.selectedTenant);
+                }
+                document.getElementById('rlsPreview').innerText = JSON.stringify(filteredTenant, null, 2);
+            }
+
+            toggleMasking() {
+                this.maskPII = document.getElementById('maskToggle').checked;
+                this.renderGovernance();
+            }
+
+            applyRLS() {
+                this.selectedTenant = document.getElementById('tenantSelect').value;
+                this.renderGovernance();
+            }
+
+            runAIModule() {
+                    const margins = this.silverData.map(s => s.margin_percent);
+                    const meanMargin = margins.length ? margins.reduce((a, b) => a + b, 0) / margins.length : 0;
+                    const lowMarginItems = this.silverData.filter(i => i.margin_percent < meanMargin);
+
+                    document.getElementById('anomalyOutput').innerHTML = `
+          <p class="text-cyan-400"><b>[Análise Z-Score]:</b> Média de Margem Calculada = <b>${meanMargin.toFixed(1)}%</b></p>
+          <p>• Produtos identificados com margem abaixo da média:</p>
+          ${lowMarginItems.map(m => `<p class="text-xs text-red-400 pl-2">⚠️ ${m.title}: Margem de ${m.margin_percent}%</p>`).join('')}
+        `;
+
+        document.getElementById('forecastOutput').innerHTML = `
+          <p class="text-indigo-400"><b>[Predictor de Conversão]:</b> Registros Analisados = ${this.silverData.length}</p>
+          <p>• Status dos canais de vendas: Saudável</p>
+        `;
+      }
+
+      renderBI() {
+        const canvas = document.getElementById('analyticsChart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        if (this.chartInstance) this.chartInstance.destroy();
+
+        if (typeof Chart !== 'undefined') {
+          this.chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: this.goldData.map(g => g.category),
+              datasets: [
+                {
+                  label: 'Receita Total (R$)',
+                  data: this.goldData.map(g => g.receita_total),
+                  backgroundColor: '#0284c7',
+                  borderRadius: 6
+                },
+                {
+                  label: 'Lucro Bruto (R$)',
+                  data: this.goldData.map(g => g.lucro_bruto),
+                  backgroundColor: '#10b981',
+                  borderRadius: 6
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: '#94a3b8' } } },
+              scales: {
+                y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+                x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+              }
+            }
+          });
+        }
+      }
+
+      exportData() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.silverData, null, 2));
+        const anchor = document.createElement('a');
+        anchor.setAttribute("href", dataStr);
+        anchor.setAttribute("download", `silver_dataset_export.json`);
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+
+      switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(el => {
+          el.classList.remove('text-cyan-400', 'border-b-2', 'border-cyan-400');
+          el.classList.add('text-slate-400');
+        });
+
+        document.getElementById(tabId).classList.add('active');
+        const activeBtn = document.querySelector(`[data-tab="${tabId}"]`);
+        if (activeBtn) {
+          activeBtn.classList.remove('text-slate-400');
+          activeBtn.classList.add('text-cyan-400', 'border-b-2', 'border-cyan-400');
+        }
+      }
+    }
+
+    const app = new LakehousePlatform();
+    window.addEventListener('DOMContentLoaded', () => {
+      app.runFullPipeline();
+    });
+    </script>
+</body>
+
+</html>
